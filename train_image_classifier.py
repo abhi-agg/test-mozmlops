@@ -8,7 +8,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 # Path where model should be saved locally
-PATH = './cifar_net.pth'
+#PATH = './cifar_net.pth'
 
 class ImageClassifier:
     def __init__(self):
@@ -124,7 +124,6 @@ class ImageClassifier:
                 correct += (predicted == labels).sum().item()
 
         print(f'Accuracy of the network on the 10000 test images: {100 * correct // total} %')
-
 
 if __name__ == "__main__":
     image_classifier = ImageClassifier()
