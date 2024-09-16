@@ -6,16 +6,20 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import torch.optim as optim
+from io import BytesIO
 
-# Path where model should be saved locally
-#PATH = './cifar_net.pth'
+from mozmlops.cloud_storage_api_client import CloudStorageAPIClient
+
+GCS_PROJECT_NAME = "moz-fx-mlops-inference-nonprod"
+GCS_BUCKET_NAME = "mf-models-test1"
 
 class ImageClassifier:
     def __init__(self):
         print(f'init image classifier')
 
-    # Load and normalize CIFAR10
-    '''def load_and_normalize_data(self):
+    # Download and normalize CIFAR10
+    def download_and_normalize_data(self):
+        print(f'downloading dataset')
         transform = transforms.Compose(
             [transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
@@ -32,14 +36,13 @@ class ImageClassifier:
         #        'deer', 'dog', 'frog', 'horse', 'ship', 'truck')'''
 
     # Train the network
-    def train(self, num_epochs):
-
+    def train(self, num_epochs) -> bytes:
         # Check if GPU is available
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"Training on: {device}")
 
         # Load and normalize CIFAR10 data
-        transform = transforms.Compose(
+        '''transform = transforms.Compose(
             [transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
         )
@@ -47,7 +50,7 @@ class ImageClassifier:
         self.trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
                                                 download=True, transform=transform)
         self.testset = torchvision.datasets.CIFAR10(root='./data', train=False,
-                                            download=True, transform=transform)
+                                            download=True, transform=transform)'''
 
         # Define a Convolutional Neural Network
         class Net(nn.Module):
@@ -75,12 +78,10 @@ class ImageClassifier:
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 
-        # load train and test data
+        # load train data
         batch_size = 4
         trainloader = torch.utils.data.DataLoader(self.trainset, batch_size=batch_size,
                                                 shuffle=True, num_workers=2)
-        testloader = torch.utils.data.DataLoader(self.testset, batch_size=batch_size,
-                                                shuffle=False, num_workers=2)
 
         # start training
         for epoch in range(num_epochs):  # loop over the dataset multiple times
@@ -105,13 +106,46 @@ class ImageClassifier:
                     running_loss = 0.0
 
         print('Finished Training')
-        #torch.save(net.state_dict(), PATH)
+        buffer = BytesIO()
+        torch.save(net.state_dict(), buffer)
+        return buffer.getvalue()
 
-        # Test the network on the test data
-        #net = Net()
-        #net.load_state_dict(torch.load(PATH, weights_only=True))
+    # Test the network on the test data
+    def evaluate(self, model_state_dict_bytes: bytes):
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"Evaluating on: {device}")
+
+        # Define a Convolutional Neural Network
+        class Net(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.conv1 = nn.Conv2d(3, 6, 5)
+                self.pool = nn.MaxPool2d(2, 2)
+                self.conv2 = nn.Conv2d(6, 16, 5)
+                self.fc1 = nn.Linear(16 * 5 * 5, 120)
+                self.fc2 = nn.Linear(120, 84)
+                self.fc3 = nn.Linear(84, 10)
+
+            def forward(self, x):
+                x = self.pool(F.relu(self.conv1(x)))
+                x = self.pool(F.relu(self.conv2(x)))
+                x = torch.flatten(x, 1) # flatten all dimensions except batch
+                x = F.relu(self.fc1(x))
+                x = F.relu(self.fc2(x))
+                x = self.fc3(x)
+                return x
+
+        net = Net().to(device)
+        buffer = BytesIO(model_state_dict_bytes)
+        net.load_state_dict(torch.load(buffer, weights_only=True))
+
         correct = 0
         total = 0
+
+        # load test data
+        batch_size = 4
+        testloader = torch.utils.data.DataLoader(self.testset, batch_size=batch_size,
+                                                shuffle=False, num_workers=2)
         # since we're not training, we don't need to calculate the gradients for our outputs
         with torch.no_grad():
             for data in testloader:
@@ -125,6 +159,18 @@ class ImageClassifier:
 
         print(f'Accuracy of the network on the 10000 test images: {100 * correct // total} %')
 
+    def upload_model_to_gcs(self, model_state_dict_bytes: bytes):
+        print(f"Uploading model to gcs")
+        # init client
+        storage_client = CloudStorageAPIClient(
+            project_name=GCS_PROJECT_NAME, bucket_name=GCS_BUCKET_NAME
+        )
+
+        storage_client.store(data=model_state_dict_bytes, storage_path="abhishek-mlops-hackdays/model-bytes.pth")
+
 if __name__ == "__main__":
     image_classifier = ImageClassifier()
-    image_classifier.train(num_epochs=2)
+    image_classifier.download_and_normalize_data()
+    model_state_dict_bytes = image_classifier.train(num_epochs=1)
+    image_classifier.evaluate(model_state_dict_bytes)
+    image_classifier.upload_model_to_gcs(model_state_dict_bytes)
