@@ -26,21 +26,16 @@ class ImageClassifier(FlowSpec):
         default=True,
     )
 
-    @pypi(python='3.11.9',
-        packages={
-            'torchvision': '0.19.1'
-        }
-    )
+
+    @pypi(python='3.11.9', packages={'torchvision': '0.19.1'})
     @card(type="default")
     @step
     def start(self):
         import torchvision
         import torchvision.transforms as transforms
 
-        print(f'start step')
-
         # Download and normalize CIFAR10
-        print(f'downloading and normalizing dataset')
+        print(f'start step: downloading and normalizing dataset')
         transform = transforms.Compose(
             [transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
@@ -50,18 +45,12 @@ class ImageClassifier(FlowSpec):
                                                 download=True, transform=transform)
         self.testset = torchvision.datasets.CIFAR10(root='./data', train=False,
                                             download=True, transform=transform)
-        #classes = ('plane', 'car', 'bird', 'cat',
-        #        'deer', 'dog', 'frog', 'horse', 'ship', 'truck')'''
         self.next(self.train)
+
 
     # Train the network
     # Keep @nvidia decorator before @step decorator else the flow fails
-    @pypi(python='3.11.9',
-        packages={
-            'torch': '2.4.1',
-            'torchvision': '0.19.1',
-        }
-    )
+    @pypi(python='3.11.9', packages={'torch': '2.4.1', 'torchvision': '0.19.1',})
     @nvidia
     @step
     def train(self):
@@ -135,13 +124,9 @@ class ImageClassifier(FlowSpec):
         self.model_state_dict_bytes = buffer.getvalue()
         self.next(self.evaluate)
 
+
     # Test the network on the test data
-    @pypi(python='3.11.9',
-        packages={
-            'torch': '2.4.1',
-            'torchvision': '0.19.1',
-        }
-    )
+    @pypi(python='3.11.9', packages={'torch': '2.4.1', 'torchvision': '0.19.1',})
     @step
     def evaluate(self):
         import torch
@@ -197,11 +182,8 @@ class ImageClassifier(FlowSpec):
         print(f'Accuracy of the network on the 10000 test images: {100 * correct // total} %')
         self.next(self.upload_model_to_gcs)
 
-    @pypi(python='3.11.9',
-        packages={
-            'mozmlops': '0.1.4',
-        }
-    )
+
+    @pypi(python='3.11.9', packages={'mozmlops': '0.1.4'})
     @step
     def upload_model_to_gcs(self):
         from mozmlops.cloud_storage_api_client import CloudStorageAPIClient
@@ -211,7 +193,6 @@ class ImageClassifier(FlowSpec):
         storage_client = CloudStorageAPIClient(
             project_name=GCS_PROJECT_NAME, bucket_name=GCS_BUCKET_NAME
         )
-
         storage_client.store(data=self.model_state_dict_bytes, storage_path="abhishek-mlops-hackdays/model-bytes.pth")
         self.next(self.end)
 
@@ -227,4 +208,4 @@ class ImageClassifier(FlowSpec):
         )
 
 if __name__ == "__main__":
-    image_classifier = ImageClassifier()
+    ImageClassifier()
