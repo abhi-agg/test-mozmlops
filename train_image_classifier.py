@@ -8,6 +8,7 @@ from metaflow import (
     environment,
     kubernetes,
     pypi,
+    nvidia,
 )
 from metaflow.cards import Markdown
 
@@ -54,12 +55,14 @@ class ImageClassifier(FlowSpec):
         self.next(self.train)
 
     # Train the network
+    # Keep @nvidia decorator before @step decorator else the flow fails
     @pypi(python='3.11.9',
         packages={
             'torch': '2.4.1',
             'torchvision': '0.19.1',
         }
     )
+    @nvidia
     @step
     def train(self):
         import torch
