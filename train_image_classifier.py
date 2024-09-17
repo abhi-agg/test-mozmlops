@@ -29,6 +29,7 @@ class ImageClassifier(FlowSpec):
 
     @pypi(python='3.11.9', packages={'torchvision': '0.19.1'})
     @card(type="default")
+    @kubernetes
     @step
     def start(self):
         import torchvision
@@ -127,6 +128,7 @@ class ImageClassifier(FlowSpec):
 
     # Test the network on the test data
     @pypi(python='3.11.9', packages={'torch': '2.4.1', 'torchvision': '0.19.1',})
+    @kubernetes
     @step
     def evaluate(self):
         import torch
@@ -184,6 +186,7 @@ class ImageClassifier(FlowSpec):
 
 
     @pypi(python='3.11.9', packages={'mozmlops': '0.1.4'})
+    @kubernetes
     @step
     def upload_model_to_gcs(self):
         from mozmlops.cloud_storage_api_client import CloudStorageAPIClient
@@ -197,6 +200,7 @@ class ImageClassifier(FlowSpec):
         self.next(self.end)
 
 
+    @kubernetes
     @step
     def end(self):
         print(
