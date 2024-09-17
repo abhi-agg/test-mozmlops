@@ -161,7 +161,7 @@ class ImageClassifier(FlowSpec):
 
         net = Net().to(device)
         buffer = BytesIO(self.model_state_dict_bytes)
-        net.load_state_dict(torch.load(buffer, weights_only=True))
+        net.load_state_dict(torch.load(buffer, map_location=device, weights_only=True))
 
         correct = 0
         total = 0
