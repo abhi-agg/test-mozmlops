@@ -56,7 +56,7 @@ class ImageClassifier(FlowSpec):
     # Train the network
     @pypi(python='3.11.9',
         packages={
-            'torch': '0.19.1'
+            'torch': '2.4.1'
         }
     )
     @step
@@ -134,7 +134,7 @@ class ImageClassifier(FlowSpec):
     # Test the network on the test data
     @pypi(python='3.11.9',
         packages={
-            'torch': '0.19.1'
+            'torch': '2.4.1'
         }
     )
     @step
