@@ -1,56 +1,75 @@
-import torch
-import torchvision
-import torchvision.transforms as transforms
-
-import torch.nn as nn
-import torch.nn.functional as F
-
-import torch.optim as optim
-from io import BytesIO
-
-from mozmlops.cloud_storage_api_client import CloudStorageAPIClient
+from metaflow import (
+    FlowSpec,
+    IncludeFile,
+    Parameter,
+    card,
+    current,
+    step,
+    environment,
+    kubernetes,
+    pypi,
+)
+from metaflow.cards import Markdown
 
 GCS_PROJECT_NAME = "moz-fx-mlops-inference-nonprod"
 GCS_BUCKET_NAME = "mf-models-test1"
 
-class ImageClassifier:
-    def __init__(self):
-        print(f'init image classifier')
+class ImageClassifier(FlowSpec):
 
-    # Download and normalize CIFAR10
-    def download_and_normalize_data(self):
-        print(f'downloading dataset')
-        transform = transforms.Compose(
-            [transforms.ToTensor(),
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
-        )
-        batch_size = 4
+    # This is an example of a parameter. You can toggle this when you call the flow
+    # with python template_flow.py run --offline False
+    offline_wandb = Parameter(
+        "offline",
+        help="Do not connect to W&B servers when training",
+        type=bool,
+        default=True,
+    )
 
-        self.trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
-                                                download=True, transform=transform)
+    @pypi(python='3.11.9',
+        packages={
+            'torchvision': '0.19.1'
+        }
+    )
+    @card(type="default")
+    @step
+    def start(self):
+        import torchvision
+        import torchvision.transforms as transforms
 
-        self.testset = torchvision.datasets.CIFAR10(root='./data', train=False,
-                                            download=True, transform=transform)
+        print(f'start step')
 
-        #classes = ('plane', 'car', 'bird', 'cat',
-        #        'deer', 'dog', 'frog', 'horse', 'ship', 'truck')'''
-
-    # Train the network
-    def train(self, num_epochs) -> bytes:
-        # Check if GPU is available
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        print(f"Training on: {device}")
-
-        # Load and normalize CIFAR10 data
+        # Download and normalize CIFAR10
+        print(f'downloading and normalizing dataset')
         '''transform = transforms.Compose(
             [transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
         )
-
+        batch_size = 4
         self.trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
                                                 download=True, transform=transform)
         self.testset = torchvision.datasets.CIFAR10(root='./data', train=False,
-                                            download=True, transform=transform)'''
+                                            download=True, transform=transform)
+        #classes = ('plane', 'car', 'bird', 'cat',
+        #        'deer', 'dog', 'frog', 'horse', 'ship', 'truck')'''
+        self.next(self.train)
+
+    # Train the network
+    @pypi(python='3.11.9',
+        packages={
+            'torch': '0.19.1'
+        }
+    )
+    @step
+    def train(self):
+        import torch
+        import torch.nn as nn
+        import torch.nn.functional as F
+        import torch.optim as optim
+        from io import BytesIO
+
+        # Check if GPU is available
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"Training on: {device}")
 
         # Define a Convolutional Neural Network
         class Net(nn.Module):
@@ -79,11 +98,12 @@ class ImageClassifier:
         optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 
         # load train data
-        batch_size = 4
+        '''batch_size = 4
         trainloader = torch.utils.data.DataLoader(self.trainset, batch_size=batch_size,
                                                 shuffle=True, num_workers=2)
 
         # start training
+        num_epochs = 2
         for epoch in range(num_epochs):  # loop over the dataset multiple times
             running_loss = 0.0
             for i, data in enumerate(trainloader, 0):
@@ -108,10 +128,22 @@ class ImageClassifier:
         print('Finished Training')
         buffer = BytesIO()
         torch.save(net.state_dict(), buffer)
-        return buffer.getvalue()
+        self.model_state_dict_bytes = buffer.getvalue()'''
+        self.next(self.evaluate)
 
     # Test the network on the test data
-    def evaluate(self, model_state_dict_bytes: bytes):
+    @pypi(python='3.11.9',
+        packages={
+            'torch': '0.19.1'
+        }
+    )
+    @step
+    def evaluate(self):
+        import torch
+        import torch.nn as nn
+        import torch.nn.functional as F
+        from io import BytesIO
+
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"Evaluating on: {device}")
 
@@ -136,7 +168,7 @@ class ImageClassifier:
                 return x
 
         net = Net().to(device)
-        buffer = BytesIO(model_state_dict_bytes)
+        '''buffer = BytesIO(self.model_state_dict_bytes)
         net.load_state_dict(torch.load(buffer, weights_only=True))
 
         correct = 0
@@ -157,20 +189,37 @@ class ImageClassifier:
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
 
-        print(f'Accuracy of the network on the 10000 test images: {100 * correct // total} %')
+        print(f'Accuracy of the network on the 10000 test images: {100 * correct // total} %')'''
+        self.next(self.upload_model_to_gcs)
 
-    def upload_model_to_gcs(self, model_state_dict_bytes: bytes):
+    @pypi(python='3.11.9',
+        packages={
+            'mozmlops': '0.1.4',
+        }
+    )
+    @step
+    def upload_model_to_gcs(self):
+        from mozmlops.cloud_storage_api_client import CloudStorageAPIClient
+
         print(f"Uploading model to gcs")
         # init client
-        storage_client = CloudStorageAPIClient(
+        '''storage_client = CloudStorageAPIClient(
             project_name=GCS_PROJECT_NAME, bucket_name=GCS_BUCKET_NAME
         )
 
-        storage_client.store(data=model_state_dict_bytes, storage_path="abhishek-mlops-hackdays/model-bytes.pth")
+        storage_client.store(data=self.model_state_dict_bytes, storage_path="abhishek-mlops-hackdays/model-bytes.pth")'''
+        self.next(self.end)
+
+
+    @step
+    def end(self):
+        print(
+            f"""
+            Flow complete.
+
+            See artifacts at {GCS_BUCKET_NAME}.
+            """
+        )
 
 if __name__ == "__main__":
     image_classifier = ImageClassifier()
-    image_classifier.download_and_normalize_data()
-    model_state_dict_bytes = image_classifier.train(num_epochs=1)
-    image_classifier.evaluate(model_state_dict_bytes)
-    image_classifier.upload_model_to_gcs(model_state_dict_bytes)
