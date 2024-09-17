@@ -40,7 +40,7 @@ class ImageClassifier(FlowSpec):
 
         # Download and normalize CIFAR10
         print(f'downloading and normalizing dataset')
-        '''transform = transforms.Compose(
+        transform = transforms.Compose(
             [transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
         )
@@ -98,7 +98,7 @@ class ImageClassifier(FlowSpec):
         optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 
         # load train data
-        '''batch_size = 4
+        batch_size = 4
         trainloader = torch.utils.data.DataLoader(self.trainset, batch_size=batch_size,
                                                 shuffle=True, num_workers=2)
 
@@ -128,7 +128,7 @@ class ImageClassifier(FlowSpec):
         print('Finished Training')
         buffer = BytesIO()
         torch.save(net.state_dict(), buffer)
-        self.model_state_dict_bytes = buffer.getvalue()'''
+        self.model_state_dict_bytes = buffer.getvalue()
         self.next(self.evaluate)
 
     # Test the network on the test data
@@ -168,7 +168,7 @@ class ImageClassifier(FlowSpec):
                 return x
 
         net = Net().to(device)
-        '''buffer = BytesIO(self.model_state_dict_bytes)
+        buffer = BytesIO(self.model_state_dict_bytes)
         net.load_state_dict(torch.load(buffer, weights_only=True))
 
         correct = 0
@@ -189,7 +189,7 @@ class ImageClassifier(FlowSpec):
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
 
-        print(f'Accuracy of the network on the 10000 test images: {100 * correct // total} %')'''
+        print(f'Accuracy of the network on the 10000 test images: {100 * correct // total} %')
         self.next(self.upload_model_to_gcs)
 
     @pypi(python='3.11.9',
@@ -203,11 +203,11 @@ class ImageClassifier(FlowSpec):
 
         print(f"Uploading model to gcs")
         # init client
-        '''storage_client = CloudStorageAPIClient(
+        storage_client = CloudStorageAPIClient(
             project_name=GCS_PROJECT_NAME, bucket_name=GCS_BUCKET_NAME
         )
 
-        storage_client.store(data=self.model_state_dict_bytes, storage_path="abhishek-mlops-hackdays/model-bytes.pth")'''
+        storage_client.store(data=self.model_state_dict_bytes, storage_path="abhishek-mlops-hackdays/model-bytes.pth")
         self.next(self.end)
 
 
