@@ -14,6 +14,7 @@ from metaflow.cards import Markdown
 
 GCS_PROJECT_NAME = "moz-fx-mlops-inference-nonprod"
 GCS_BUCKET_NAME = "mf-models-test1"
+MODEL_STORAGE_PATH="abhishek-mlops-hackdays/model-bytes.pth"
 
 class ImageClassifier(FlowSpec):
 
@@ -61,8 +62,13 @@ class ImageClassifier(FlowSpec):
         import torch.optim as optim
         from io import BytesIO
 
+        device = torch.device("cpu")
         # Check if GPU is available
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if torch.cuda.is_available():
+            import os
+            print(os.system("nvidia-smi"))
+            device = torch.device("cuda")
+
         print(f"Training on: {device}")
 
         # Define a Convolutional Neural Network
@@ -196,7 +202,7 @@ class ImageClassifier(FlowSpec):
         storage_client = CloudStorageAPIClient(
             project_name=GCS_PROJECT_NAME, bucket_name=GCS_BUCKET_NAME
         )
-        storage_client.store(data=self.model_state_dict_bytes, storage_path="abhishek-mlops-hackdays/model-bytes.pth")
+        storage_client.store(data=self.model_state_dict_bytes, storage_path=MODEL_STORAGE_PATH)
         self.next(self.end)
 
 
