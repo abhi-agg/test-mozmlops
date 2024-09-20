@@ -54,8 +54,8 @@ class ImageClassifier(FlowSpec):
     # Train the network
     # Keep @nvidia decorator before @step decorator else the flow fails
     @pypi(python='3.11.9', packages={'torch': '2.4.1', 'torchvision': '0.19.1', 'mozmlops': '0.1.4'},)
-    #@nvidia
-    @kubernetes
+    @nvidia
+    #@kubernetes
     @card
     @environment(
         vars={
