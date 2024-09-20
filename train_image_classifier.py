@@ -1,3 +1,4 @@
+import os
 from metaflow import (
     FlowSpec,
     IncludeFile,
@@ -52,8 +53,16 @@ class ImageClassifier(FlowSpec):
 
     # Train the network
     # Keep @nvidia decorator before @step decorator else the flow fails
-    @pypi(python='3.11.9', packages={'torch': '2.4.1', 'torchvision': '0.19.1',})
+    @pypi(python='3.11.9', packages={'torch': '2.4.1', 'torchvision': '0.19.1', 'mozmlops': '0.1.4'},)
     @nvidia
+    @card
+    @environment(
+        vars={
+            "WANDB_API_KEY": os.getenv("WANDB_API_KEY"),
+            "WANDB_ENTITY": os.getenv("WANDB_ENTITY"),
+            "WANDB_PROJECT": os.getenv("WANDB_PROJECT"),
+        }
+    )
     @step
     def train(self):
         import torch
@@ -61,6 +70,16 @@ class ImageClassifier(FlowSpec):
         import torch.nn.functional as F
         import torch.optim as optim
         from io import BytesIO
+        import wandb
+        import os
+
+        if not self.offline_wandb:
+            tracking_run = wandb.init(project=os.getenv("WANDB_PROJECT"))
+            wandb_url = tracking_run.get_url()
+            current.card.append(Markdown("# Weights & Biases"))
+            current.card.append(
+                Markdown(f"Your training run is tracked [here]({wandb_url}).")
+            )
 
         device = torch.device("cpu")
         # Check if GPU is available
@@ -123,6 +142,8 @@ class ImageClassifier(FlowSpec):
                 running_loss += loss.item()
                 if i % 2000 == 1999:    # print every 2000 mini-batches
                     print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 2000:.3f}')
+                    # log metrics to wandb
+                    wandb.log({"mini-batches": {i + 1}, "loss": {running_loss / 2000}})
                     running_loss = 0.0
 
         print('Finished Training')
